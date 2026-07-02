@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Cpu, RefreshCw } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { api } from "@/services/api";
 
 type TabType = "login" | "register";
 
@@ -11,6 +11,11 @@ export default function LoginPage() {
   const router = useRouter();
   const [tab, setTab] = useState<TabType>("login");
   const [loading, setLoading] = useState(false);
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [company, setCompany] = useState("");
 
   // const handle = () => {
   //   setLoading(true);
@@ -22,9 +27,52 @@ export default function LoginPage() {
   //   }, 900);
   // };
 
-  const handle = () => {
-    console.log("login clicked");
-    router.push("/dashboard");
+  const handle = async () => {
+    setLoading(true);
+
+    try {
+      if (tab === "login") {
+        const res = await api.post("/auth/login", {
+          email,
+          password,
+        });
+
+        console.log(res.data);
+
+        localStorage.setItem(
+          "token",
+          res.data.access_token
+        );
+
+        router.push("/dashboard");
+      } else {
+        await api.post("/auth/register", {
+          name,
+          email,
+          password,
+          company_name: company,
+        });
+
+        alert("Registration Successful!");
+
+        setTab("login");
+
+        setName("");
+        setEmail("");
+        setPassword("");
+        setCompany("");
+      }
+    } catch (err: any) {
+      console.log(err);
+
+      alert(
+        typeof err.response?.data?.detail === "string"
+          ? err.response.data.detail
+          : "Something went wrong"
+      );
+    }
+
+    setLoading(false);
   };
   
   
@@ -93,7 +141,7 @@ export default function LoginPage() {
             {(["login", "register"] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => {alert(t);setTab(t);}}
+                onClick={() => setTab(t)}
                 className={`flex-1 py-2 text-sm font-medium rounded-md transition-all capitalize
                   ${
                     tab === t
@@ -128,6 +176,8 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Rachel Kim"
                   className="w-full bg-input-background border border-border rounded-md px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -140,6 +190,8 @@ export default function LoginPage() {
               </label>
               <input
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="rachel@acme.com"
                 className="w-full bg-input-background border border-border rounded-md px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
@@ -151,6 +203,8 @@ export default function LoginPage() {
               </label>
               <input
                 type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full bg-input-background border border-border rounded-md px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
@@ -163,6 +217,8 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
                   placeholder="Acme Corp"
                   className="w-full bg-input-background border border-border rounded-md px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 />
