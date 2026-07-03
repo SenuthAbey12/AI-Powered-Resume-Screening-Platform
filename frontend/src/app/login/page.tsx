@@ -17,16 +17,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [company, setCompany] = useState("");
 
-  // const handle = () => {
-  //   setLoading(true);
-
-  //   setTimeout(() => {
-  //     auth.signIn(); // ⚠️ replace with real API later
-  //     setLoading(false);
-  //     router.push("/dashboard");
-  //   }, 900);
-  // };
-
   const handle = async () => {
     setLoading(true);
 

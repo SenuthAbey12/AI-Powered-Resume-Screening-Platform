@@ -1,17 +1,60 @@
 "use client";
-
-import { useState } from "react";
-import { Upload, FileText, RefreshCw } from "lucide-react";
+import type { ChangeEvent } from "react";
+import { useState, useRef } from "react";
+import { Upload, FileText, RefreshCw, X } from "lucide-react";
 import { Topbar, Badge, ScorePill } from "@/components/shared";
 import { Sidebar } from "@/components/Sidebar";
+import { api } from "@/services/api";
 
 export default function ResumeUploadPage() {
   const [dragging, setDragging] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploaded, setUploaded] = useState([
     { name: "sarah_chen_resume.pdf", size: "312 KB", status: "analyzed", score: 94 },
     { name: "marcus_okafor_cv.pdf", size: "256 KB", status: "analyzed", score: 89 },
     { name: "priya_nair_resume.pdf", size: "198 KB", status: "processing", score: null },
   ]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBrowse = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    setSelectedFiles(prev => [...prev, ...files]);
+    event.target.value = "";
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpload = async () => {
+    const queue = selectedFiles.map(file => ({
+      name: file.name,
+      size: `${(file.size / 1024).toFixed(1)} KB`,
+      status: "processing",
+      score: null,
+    }));
+
+    setUploaded(prev => [...prev, ...queue]);
+
+    for (const file of selectedFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await api.post("/upload-resume", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      console.log(res.data);
+    }
+
+    setSelectedFiles([]);
+  };
 
   return (
     <div className="flex h-screen">
@@ -40,18 +83,8 @@ export default function ResumeUploadPage() {
             onDrop={(e) => {
               e.preventDefault();
               setDragging(false);
-
-              const names = Array.from(e.dataTransfer.files).map((f) => f.name);
-
-              setUploaded((prev) => [
-                ...prev,
-                ...names.map((n) => ({
-                  name: n,
-                  size: "—",
-                  status: "queued",
-                  score: null,
-                })),
-              ]);
+              const files = Array.from(e.dataTransfer.files);
+              setSelectedFiles(prev => [...prev, ...files]);
             }}
             className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer
               ${
@@ -73,10 +106,70 @@ export default function ResumeUploadPage() {
               </div>
             </div>
 
-            <button className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-md transition-colors">
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.docx,.txt"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <button
+              onClick={handleBrowse}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-md transition-colors"
+            >
               Browse Files
             </button>
           </div>
+
+          {/* SELECTED FILES SECTION */}
+          {selectedFiles.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-sm font-medium">
+                  Selected Files
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                  {selectedFiles.length} selected
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {selectedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex justify-between items-center border border-border rounded-md px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText size={16} className="text-indigo-400" />
+                      <div>
+                        <div className="text-sm">{file.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {(file.size / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveFile(index)}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={handleUpload}
+                  className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-md text-sm transition-colors"
+                >
+                  Upload
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* SCREENING CONTEXT */}
           <div className="bg-card border border-border rounded-lg p-5">
@@ -103,11 +196,11 @@ export default function ResumeUploadPage() {
             </div>
           </div>
 
-          {/* TABLE */}
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          {/* UPLOADED FILES TABLE */}
+          <div className="bg-card border border-border rounded-lg overflow-x-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <div className="text-sm font-medium text-foreground">
-                Upload Queue
+                Uploaded Files
               </div>
 
               <div className="flex items-center gap-2">
@@ -135,71 +228,79 @@ export default function ResumeUploadPage() {
               </thead>
 
               <tbody className="divide-y divide-border">
-                {uploaded.map((f, i) => (
-                  <tr key={i} className="hover:bg-white/2 transition-colors">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <FileText
-                          size={14}
-                          className="text-indigo-400 shrink-0"
-                        />
-                        <span className="text-sm text-foreground font-mono">
-                          {f.name}
-                        </span>
-                      </div>
-                    </td>
+                {uploaded
+                  .slice(-10)
+                  .reverse()
+                  .map((f, i) => {
+                    console.log(i, f.name);
 
-                    <td className="px-5 py-3 text-xs text-muted-foreground font-mono">
-                      {f.size}
-                    </td>
+                    return (
+                    
+                      <tr key={i} className="hover:bg-white/2 transition-colors">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <FileText
+                              size={14}
+                              className="text-indigo-400 shrink-0"
+                            />
+                            <span className="text-sm text-foreground font-mono">
+                              {f.name}
+                            </span>
+                          </div>
+                        </td>
 
-                    <td className="px-5 py-3">
-                      {f.status === "analyzed" && (
-                        <Badge label="ANALYZED" variant="success" />
-                      )}
+                        <td className="px-5 py-3 text-xs text-muted-foreground font-mono">
+                          {f.size}
+                        </td>
 
-                      {f.status === "processing" && (
-                        <span className="flex items-center gap-1.5 text-xs font-mono text-amber-400">
-                          <RefreshCw size={11} className="animate-spin" />
-                          Processing
-                        </span>
-                      )}
+                        <td className="px-5 py-3">
+                          {f.status === "analyzed" && (
+                            <Badge label="ANALYZED" variant="success" />
+                          )}
 
-                      {f.status === "queued" && (
-                        <Badge label="QUEUED" variant="default" />
-                      )}
-                    </td>
+                          {f.status === "processing" && (
+                            <span className="flex items-center gap-1.5 text-xs font-mono text-amber-400">
+                              <RefreshCw size={11} className="animate-spin" />
+                              Processing
+                            </span>
+                          )}
 
-                    <td className="px-5 py-3">
-                      {f.score ? (
-                        <ScorePill score={f.score} />
-                      ) : (
-                        <span className="text-muted-foreground font-mono text-xs">
-                          —
-                        </span>
-                      )}
-                    </td>
+                          {f.status === "queued" && (
+                            <Badge label="QUEUED" variant="default" />
+                          )}
+                        </td>
 
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <button className="text-xs text-indigo-400 hover:text-indigo-300 font-mono">
-                          View
-                        </button>
+                        <td className="px-5 py-3">
+                          {f.score ? (
+                            <ScorePill score={f.score} />
+                          ) : (
+                            <span className="text-muted-foreground font-mono text-xs">
+                              —
+                            </span>
+                          )}
+                        </td>
 
-                        <button
-                          onClick={() =>
-                            setUploaded((prev) =>
-                              prev.filter((_, j) => j !== i)
-                            )
-                          }
-                          className="text-xs text-muted-foreground hover:text-red-400 font-mono"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <button className="text-xs text-indigo-400 hover:text-indigo-300 font-mono">
+                              View
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                setUploaded((prev) =>
+                                  prev.filter((_, j) => j !== i)
+                                )
+                              }
+                              className="text-xs text-muted-foreground hover:text-red-400 font-mono"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
               </tbody>
             </table>
           </div>
