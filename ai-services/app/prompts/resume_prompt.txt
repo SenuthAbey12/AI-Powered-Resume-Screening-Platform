@@ -21,7 +21,8 @@ OUTPUT FORMAT:
   "education": [],
   "experience": [],
   "projects": [],
-  "certifications": []
+  "certifications": [],
+  "achievements": []
 }
 
 EXTRA RULES PER FIELD:
