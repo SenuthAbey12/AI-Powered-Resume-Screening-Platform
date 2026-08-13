@@ -1,47 +1,61 @@
+from pathlib import Path
+
 import fitz
 from docx import Document
-from pathlib import Path
 
 
 class TextExtractor:
+    """Extract plain text from PDF and DOCX resume files."""
 
     @staticmethod
     def extract_text(file_path: str) -> str:
+        path = Path(file_path)
 
-        extension = Path(file_path).suffix.lower()
+        if not path.exists():
+            raise ValueError(f"Resume file does not exist: {file_path}")
+
+        extension = path.suffix.lower()
 
         if extension == ".pdf":
-            return TextExtractor._extract_pdf(file_path)
-
+            text = TextExtractor._extract_pdf(file_path)
         elif extension == ".docx":
-            return TextExtractor._extract_docx(file_path)
+            text = TextExtractor._extract_docx(file_path)
+        else:
+            raise ValueError(
+                "Unsupported resume file type. Only PDF and DOCX are allowed."
+            )
 
-        raise ValueError("Unsupported file type")
+        cleaned_text = text.strip()
 
+        if not cleaned_text:
+            raise ValueError(
+                "No readable text was found in the resume. "
+                "The file may be scanned or image-based."
+            )
+
+        return cleaned_text
 
     @staticmethod
     def _extract_pdf(file_path: str) -> str:
+        text_parts: list[str] = []
 
-        document = fitz.open(file_path)
+        with fitz.open(file_path) as document:
+            for page in document:
+                page_text = page.get_text("text")
 
-        text = ""
+                if page_text:
+                    text_parts.append(page_text)
 
-        for page in document:
-            text += page.get_text()
-
-        document.close()
-
-        return text
-
+        return "\n".join(text_parts)
 
     @staticmethod
     def _extract_docx(file_path: str) -> str:
-
         document = Document(file_path)
 
-        text = "\n".join(
-            paragraph.text
+        paragraphs = [
+            paragraph.text.strip()
             for paragraph in document.paragraphs
-        )
+            if paragraph.text.strip()
+        ]
 
-        return text
+        return "\n".join(paragraphs)

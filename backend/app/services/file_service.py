@@ -1,5 +1,7 @@
 import os
 import uuid
+from pathlib import Path
+
 from fastapi import UploadFile
 
 UPLOAD_DIR = "uploads"
@@ -38,3 +40,13 @@ class FileService:
             "file_path": file_path,
             "filename": filename
         }
+
+    @staticmethod
+    def delete_temp_file(file_path: str) -> None:
+        upload_directory = Path(UPLOAD_DIR).resolve()
+        target_path = Path(file_path).resolve()
+
+        if upload_directory not in target_path.parents:
+            return
+
+        target_path.unlink(missing_ok=True)

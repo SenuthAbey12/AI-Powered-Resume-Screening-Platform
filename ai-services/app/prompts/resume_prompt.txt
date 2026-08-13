@@ -19,7 +19,14 @@ OUTPUT FORMAT:
   "summary": "",
   "skills": [],
   "education": [],
-  "experience": [],
+  "experience": [
+    {
+      "title": "",
+      "company": "",
+      "period": "",
+      "description": ""
+    }
+  ],
   "projects": [],
   "certifications": [],
   "achievements": []
@@ -38,7 +45,7 @@ EXTRA RULES PER FIELD:
 - Keep as list of strings (full education entries)
 
 4. experience:
-- Keep as list of job entries if available
+- Keep as a list of objects using title, company, period, and description
 - If not detailed, return empty array
 
 5. projects:

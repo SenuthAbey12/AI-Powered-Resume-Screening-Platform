@@ -5,11 +5,8 @@ from pydantic import BaseModel, EmailStr ,ConfigDict
 class UserCreate(BaseModel):
 
     name: str
-
     email: EmailStr
-
     password: str
-
     company_name: str
 
 
