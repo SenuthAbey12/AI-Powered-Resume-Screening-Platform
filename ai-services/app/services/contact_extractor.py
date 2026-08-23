@@ -1,72 +1,108 @@
 import re
+from typing import Optional
 
 
 class ContactExtractor:
+
     EMAIL_PATTERN = re.compile(
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
+        r"\b[A-Za-z0-9._%+-]+"
+        r"@[A-Za-z0-9.-]+"
+        r"\.[A-Za-z]{2,}\b"
     )
 
     PHONE_PATTERN = re.compile(
-        r"(?<!\d)(?:\+?\d[\d\s().-]{7,}\d)(?!\d)"
+        r"(?<!\w)"
+        r"(?:\+?\d[\d\s().-]{7,}\d)"
+        r"(?!\w)"
     )
 
-    LINKEDIN_PATTERN = re.compile(
-        r"(?:https?://)?(?:www\.)?linkedin\.com/in/[A-Za-z0-9_-]+",
+    URL_PATTERN = re.compile(
+        r"(?:https?://|www\.)"
+        r"[^\s<>()\[\]{}]+",
         re.IGNORECASE,
     )
 
-    @classmethod
-    def extract(cls, text: str) -> dict[str, str]:
-        email_match = cls.EMAIL_PATTERN.search(text)
-        linkedin_match = cls.LINKEDIN_PATTERN.search(text)
-        phone = cls._find_phone(text)
+    @staticmethod
+    def _unique(values: list[str]) -> list[str]:
+        result = []
+        seen = set()
 
-        return {
-            "email": (
-                email_match.group(0).strip()
-                if email_match
-                else ""
-            ),
-            "phone": phone,
-            "linkedin": (
-                linkedin_match.group(0).strip()
-                if linkedin_match
-                else ""
-            ),
-        }
+        for value in values:
+            cleaned = value.strip().rstrip(".,;:)")
 
-    @classmethod
-    def _find_phone(cls, text: str) -> str:
-        for line in text.splitlines():
-            for phone_match in cls.PHONE_PATTERN.finditer(line):
-                phone = cls._clean_phone(phone_match.group(0))
+            key = cleaned.lower()
 
-                if cls._is_likely_phone(phone, line):
-                    return phone
+            if cleaned and key not in seen:
+                seen.add(key)
+                result.append(cleaned)
 
-        return ""
+        return result
 
     @staticmethod
-    def _is_likely_phone(phone: str, source_line: str) -> bool:
+    def _normalize_phone(phone: str) -> Optional[str]:
+
+        phone = phone.strip()
+
+        has_plus = phone.startswith("+")
+
         digits = re.sub(r"\D", "", phone)
 
-        if not 8 <= len(digits) <= 15:
-            return False
+        # Avoid dates / random small numbers.
+        if len(digits) < 8 or len(digits) > 15:
+            return None
 
-        # Do not treat common employment/education year ranges as phones.
-        if re.fullmatch(r"\d{4}\s*[-\u2013\u2014]\s*\d{4}", phone):
-            return False
+        if has_plus:
+            return "+" + digits
 
-        has_phone_label = bool(
-            re.search(
-                r"\b(?:phone|mobile|tel|telephone|contact)\b",
-                source_line,
-                re.IGNORECASE,
-            )
+        return digits
+
+    @classmethod
+    def extract(cls, text: str) -> dict:
+
+        emails = cls._unique(
+            cls.EMAIL_PATTERN.findall(text)
         )
 
-        return len(digits) >= 9 or phone.startswith("+") or has_phone_label
+        raw_phones = cls.PHONE_PATTERN.findall(text)
 
-    @staticmethod
-    def _clean_phone(phone: str) -> str:
-        return re.sub(r"\s+", " ", phone).strip()
+        phones = []
+
+        for phone in raw_phones:
+            normalized = cls._normalize_phone(phone)
+
+            if normalized and normalized not in phones:
+                phones.append(normalized)
+
+        urls = cls._unique(
+            cls.URL_PATTERN.findall(text)
+        )
+
+        linkedin = None
+        github = None
+        portfolio = None
+        other_urls = []
+
+        for url in urls:
+
+            lowered = url.lower()
+
+            if "linkedin.com/" in lowered:
+                linkedin = linkedin or url
+
+            elif "github.com/" in lowered:
+                github = github or url
+
+            elif portfolio is None:
+                portfolio = url
+
+            else:
+                other_urls.append(url)
+
+        return {
+            "email": emails[0] if emails else None,
+            "phone": phones[0] if phones else None,
+            "linkedin": linkedin,
+            "github": github,
+            "portfolio": portfolio,
+            "other_urls": other_urls,
+        }
